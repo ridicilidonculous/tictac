@@ -1,0 +1,266 @@
+<html><head><base href="." /><title>Tic Tac Toe vs AI</title>
+<style>
+:root {
+  --cell-size: 100px;
+  --board-bg: #14131a;
+  --cell-border: #2b2a33;
+  --hover-bg: #2b2a33;
+  --x-color: #00b4d8;
+  --o-color: #ff595e;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #0d0c11;
+  font-family: Arial, sans-serif;
+}
+
+.container {
+  text-align: center;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, var(--cell-size));
+  grid-template-rows: repeat(3, var(--cell-size));
+  gap: 5px;
+  background: var(--board-bg);
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.cell {
+  background: var(--board-bg);
+  border: 2px solid var(--cell-border);
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.3s;
+}
+
+.cell:hover:not(.x):not(.o) {
+  background: var(--hover-bg);
+}
+
+.status {
+  color: white;
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.reset-btn {
+  background: #4a4a5e;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.reset-btn:hover {
+  background: #5f5f77;
+}
+
+.x::before, .o::before {
+  font-size: 60px;
+  font-weight: bold;
+}
+
+.x::before {
+  content: "X";
+  color: var(--x-color);
+}
+
+.o::before {
+  content: "O";
+  color: var(--o-color);
+}
+
+.winner-line {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.3);
+  transition: transform 0.3s ease-in-out;
+}
+
+.thinking {
+  opacity: 0.7;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="status">Your turn (X)</div>
+  <div class="board">
+    <div class="cell" data-index="0"></div>
+    <div class="cell" data-index="1"></div>
+    <div class="cell" data-index="2"></div>
+    <div class="cell" data-index="3"></div>
+    <div class="cell" data-index="4"></div>
+    <div class="cell" data-index="5"></div>
+    <div class="cell" data-index="6"></div>
+    <div class="cell" data-index="7"></div>
+    <div class="cell" data-index="8"></div>
+  </div>
+  <button class="reset-btn">Reset Game</button>
+</div>
+
+<script>
+const gameState = {
+  board: Array(9).fill(''),
+  currentPlayer: 'X',
+  gameActive: true,
+  isAIThinking: false
+};
+
+const winningCombinations = [
+  [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+  [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+  [0, 4, 8], [2, 4, 6] // Diagonals
+];
+
+const cells = document.querySelectorAll('.cell');
+const status = document.querySelector('.status');
+const resetBtn = document.querySelector('.reset-btn');
+const board = document.querySelector('.board');
+
+cells.forEach(cell => {
+  cell.addEventListener('click', handleCellClick);
+});
+
+resetBtn.addEventListener('click', resetGame);
+
+function handleCellClick(e) {
+  const cell = e.target;
+  const index = cell.dataset.index;
+
+  if (gameState.board[index] !== '' || !gameState.gameActive || gameState.isAIThinking) return;
+
+  makeMove(index);
+  
+  if (gameState.gameActive) {
+    gameState.isAIThinking = true;
+    board.classList.add('thinking');
+    status.textContent = "AI is thinking...";
+    
+    // Slight delay to show AI "thinking"
+    setTimeout(() => {
+      makeAIMove();
+      gameState.isAIThinking = false;
+      board.classList.remove('thinking');
+    }, 600);
+  }
+}
+
+function makeMove(index) {
+  gameState.board[index] = gameState.currentPlayer;
+  cells[index].classList.add(gameState.currentPlayer.toLowerCase());
+  
+  if (checkWin()) {
+    status.textContent = `${gameState.currentPlayer === 'X' ? 'You win!' : 'AI wins!'}`;
+    gameState.gameActive = false;
+    return;
+  }
+
+  if (checkDraw()) {
+    status.textContent = "It's a draw!";
+    gameState.gameActive = false;
+    return;
+  }
+
+  gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+  if (gameState.currentPlayer === 'X') {
+    status.textContent = "Your turn (X)";
+  }
+}
+
+function makeAIMove() {
+  const availableMoves = gameState.board
+    .map((cell, index) => cell === '' ? index : null)
+    .filter(cell => cell !== null);
+    
+  if (availableMoves.length === 0) return;
+
+  // Try to win
+  const winningMove = findBestMove('O');
+  if (winningMove !== null) {
+    makeMove(winningMove);
+    return;
+  }
+
+  // Block player from winning
+  const blockingMove = findBestMove('X');
+  if (blockingMove !== null) {
+    makeMove(blockingMove);
+    return;
+  }
+
+  // Take center if available
+  if (gameState.board[4] === '') {
+    makeMove(4);
+    return;
+  }
+
+  // Take a corner
+  const corners = [0, 2, 6, 8].filter(i => gameState.board[i] === '');
+  if (corners.length > 0) {
+    makeMove(corners[Math.floor(Math.random() * corners.length)]);
+    return;
+  }
+
+  // Take any available move
+  const randomIndex = Math.floor(Math.random() * availableMoves.length);
+  makeMove(availableMoves[randomIndex]);
+}
+
+function findBestMove(player) {
+  for (const combination of winningCombinations) {
+    const [a, b, c] = combination;
+    const line = [gameState.board[a], gameState.board[b], gameState.board[c]];
+    const playerCount = line.filter(cell => cell === player).length;
+    const emptyCount = line.filter(cell => cell === '').length;
+
+    if (playerCount === 2 && emptyCount === 1) {
+      const moveIndex = combination[line.findIndex(cell => cell === '')];
+      return moveIndex;
+    }
+  }
+  return null;
+}
+
+function checkWin() {
+  return winningCombinations.some(combination => {
+    return combination.every(index => {
+      return gameState.board[index] === gameState.currentPlayer;
+    });
+  });
+}
+
+function checkDraw() {
+  return gameState.board.every(cell => cell !== '');
+}
+
+function resetGame() {
+  gameState.board = Array(9).fill('');
+  gameState.currentPlayer = 'X';
+  gameState.gameActive = true;
+  gameState.isAIThinking = false;
+  
+  cells.forEach(cell => {
+    cell.classList.remove('x', 'o');
+  });
+  
+  board.classList.remove('thinking');
+  status.textContent = "Your turn (X)";
+}
+</script>
+</body></html>
